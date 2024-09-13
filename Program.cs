@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace Kalendář_EOW
+namespace Kalendář_EOW_Release
 {
     static class Program
     {

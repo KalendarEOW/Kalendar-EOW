@@ -1,155 +1,101 @@
-﻿using System;
+﻿
+using System;
+using System.Drawing;
 using System.Windows.Forms;
 
-namespace Kalendář_EOW
+namespace Kalendář_EOW_Release
 {
     public partial class oknoProgramu : Form
     {
-        readonly KalendarEOW zakladniDatumEOW = new KalendarEOW(4041, 1, 53);
-        readonly DateTime zakladniDatumG = new DateTime(2022, 2, 17);
-        KalendarEOW datumEOW;
-        bool interakceUzivatele = true;
+        DatumEOW datumEOW;
+        DateTime datumG;
+        DatumEOW datumPriSpusteniEOW;
+        DateTime datumPriSpusteniG;
+
+        decimal rok;
+        decimal presahRoku = 0;
+        bool interakceUzivatele = false;
+
         public oknoProgramu()
         {
-            MessageBox.Show("Verze 1.2");
+            MessageBox.Show("Verze 2.6");
             InitializeComponent();
         }
 
         private void oknoProgramu_Load(object sender, EventArgs e)
         {
-            DateTime časPřiSpuštění = DateTime.Today;
-            UkazatelDatumuG.Value = časPřiSpuštění;
+            datumPriSpusteniG = DateTime.Today;
+            datumG = datumPriSpusteniG;
+            rok = datumPriSpusteniG.Year;
+            datumEOW = prevodDatumu.naDatumEOW(datumG, presahRoku);
+            datumPriSpusteniEOW = datumEOW;
+            aktualizujTexty();
+            interakceUzivatele = true;
         }
 
-        private void datumG_ValueChanged(object sender, EventArgs e)
+        private void ciselnikDny_ValueChanged(object sender, EventArgs e)
         {
-            if (!interakceUzivatele)
+            if (!interakceUzivatele || !ValidateChildren())
                 return;
-            interakceUzivatele = false;
-            DateTime ciloveDatumG = UkazatelDatumuG.Value;
-            DateTime datumG = new DateTime(zakladniDatumG.Year, zakladniDatumG.Month, zakladniDatumG.Day);
-            datumEOW = new KalendarEOW(zakladniDatumEOW.Rok, zakladniDatumEOW.Mesic, zakladniDatumEOW.Den);
 
-            if (ciloveDatumG > zakladniDatumG)
-            {
-                do
-                {
-                    datumG = datumG.AddDays(1);
-                    datumEOW.AddDays(1);
-                } while (datumG != ciloveDatumG);
-                poleEOW.Text = datumEOW.ToString();
-                poleDny.Text = datumEOW.DniDoKonceSveta.ToString();
-                poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
+            (DatumEOW, DateTime, decimal) vysledek = prevodDatumu.naDatumEOW_DateTime(ciselnikDny.Value);
+            datumG = vysledek.Item2;
+            datumEOW = vysledek.Item1;
+            presahRoku = vysledek.Item3;
 
-            }
-            else if (ciloveDatumG < zakladniDatumG)
-            {
-                do
-                {
-                    datumG = datumG.AddDays(-1);
-                    datumEOW.AddDays(-1);
-                } while (datumG != ciloveDatumG);
-                poleEOW.Text = datumEOW.ToString();
-                poleDny.Text = datumEOW.DniDoKonceSveta.ToString();
-                poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-            }
-            else
-            {
-                poleEOW.Text = datumEOW.ToString();
-                poleDny.Text = datumEOW.DniDoKonceSveta.ToString();
-                poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-            }
-            interakceUzivatele = true;
+            aktualizujTexty();
+        }
+
+        private void poleDatumuG_Click(object sender, EventArgs e)
+        {
+            vyberDatumuG oknoKalendare = new vyberDatumuG(datumG.Day, datumG.Month, rok, datumPriSpusteniG);
+            oknoKalendare.Size = new Size((int)Math.Max(Math.Min(176 + 6 * Math.Floor(Math.Log10(Math.Abs(Convert.ToDouble(rok)))), oknoKalendare.MaximumSize.Width), oknoKalendare.MinimumSize.Width), oknoKalendare.Size.Height);
+            if (oknoKalendare.ShowDialog() == DialogResult.Cancel)
+                return;
+            rok = oknoKalendare.rok;
+            presahRoku = Math.Truncate((rok - 400) / 9600);
+            datumG = new DateTime((int)(((rok - 400) % 9600) + (rok < 400&& ((rok - 400) % 9600!=0)? 10000 : 400)), oknoKalendare.mesic, oknoKalendare.den);
+            presahRoku -= rok < 400 && ((rok - 400) % 9600 != 0) ? 1 : 0;
+
+            datumEOW = prevodDatumu.naDatumEOW(datumG, presahRoku);
+            aktualizujTexty();
         }
 
         private void poleEOW_Click(object sender, EventArgs e)
         {
-            kalendarEOW oknoKalendare = new kalendarEOW(datumEOW.Den, datumEOW.Mesic, datumEOW.Rok);
-            oknoKalendare.ShowDialog();
-            datumEOW = new KalendarEOW(oknoKalendare.rok, oknoKalendare.mesic, oknoKalendare.den);
+            vyberDatumuEOW oknoKalendare = new vyberDatumuEOW(datumEOW, datumPriSpusteniEOW);
+            oknoKalendare.Size = new Size((int)Math.Max(Math.Min(176 + 6 * Math.Floor(Math.Log10(Math.Abs(Convert.ToDouble(rok)))), oknoKalendare.MaximumSize.Width), oknoKalendare.MinimumSize.Width), oknoKalendare.Size.Height);
+
+            if (oknoKalendare.ShowDialog() == DialogResult.Cancel)
+                return;
+
+
+            datumEOW = new DatumEOW(oknoKalendare.rok, oknoKalendare.mesic, oknoKalendare.den);
+            ciselnikDny.Value = datumEOW.DniDoKonceSveta;
+        }
+        private void aktualizujTexty()
+        {
+            interakceUzivatele = false;
+            rok = datumG.Year + 9600 * presahRoku;
             poleEOW.Text = datumEOW.ToString();
-        }
-
-        private void poleEOW_TextChanged(object sender, EventArgs e)
-        {
-            if (!interakceUzivatele)
-                return;
-            interakceUzivatele = false;
-            KalendarEOW ciloveDatumEOW = datumEOW;
-            DateTime datumG = new DateTime(zakladniDatumG.Year, zakladniDatumG.Month, zakladniDatumG.Day);
-            datumEOW = new KalendarEOW(zakladniDatumEOW.Rok, zakladniDatumEOW.Mesic, zakladniDatumEOW.Den);
-
-            if (ciloveDatumEOW.Rok < zakladniDatumEOW.Rok || (ciloveDatumEOW.Rok == zakladniDatumEOW.Rok && ciloveDatumEOW.Mesic > zakladniDatumEOW.Mesic) || (ciloveDatumEOW.Rok == zakladniDatumEOW.Rok && ciloveDatumEOW.Mesic == zakladniDatumEOW.Mesic && ciloveDatumEOW.Den > zakladniDatumEOW.Den))
-            {
-                do
-                {
-                    datumG = datumG.AddDays(1);
-                    datumEOW.AddDays(1);
-                } while (datumEOW != ciloveDatumEOW);
-                UkazatelDatumuG.Text = datumG.ToString();
-                poleDny.Text = datumEOW.DniDoKonceSveta.ToString();
-                poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-
-            }
-            else if (ciloveDatumEOW != zakladniDatumEOW)
-            {
-                do
-                {
-                    datumG = datumG.AddDays(-1);
-                    datumEOW.AddDays(-1);
-                } while (datumEOW != ciloveDatumEOW);
-                UkazatelDatumuG.Text = datumG.ToString();
-                poleDny.Text = datumEOW.DniDoKonceSveta.ToString();
-                poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-            }
+            poleG.Text = datumG.Day + ". " + datumG.Month + ". " + rok.ToString();
+            ciselnikDny.Value = datumEOW.DniDoKonceSveta;
+            poleLetG.Text = (11946 - rok - (datumG.Month > 4 || (datumG.Month == 4 && datumG.Day > 16) ? 1 : 0)).ToString();
             interakceUzivatele = true;
         }
 
-        private void poleDny_TextChanged(object sender, EventArgs e) //nevyužíváno
+        private void ciselnikDny_Validated(object sender, EventArgs e)
         {
-            if (!interakceUzivatele)
-                return;
-            interakceUzivatele = false;
-            try
-            {
-                long ciloveDnyDoKonceSveta = Convert.ToInt64(poleDny.Text);
-                DateTime datumG = new DateTime(zakladniDatumG.Year, zakladniDatumG.Month, zakladniDatumG.Day);
-                datumEOW = new KalendarEOW(zakladniDatumEOW.Rok, zakladniDatumEOW.Mesic, zakladniDatumEOW.Den);
-                if (ciloveDnyDoKonceSveta < datumEOW.DniDoKonceSveta)
-                {
-                    do
-                    {
-                        datumG = datumG.AddDays(1);
-                        datumEOW.AddDays(1);
-                    } while (ciloveDnyDoKonceSveta != datumEOW.DniDoKonceSveta);
-                    poleEOW.Text = datumEOW.ToString();
-                    UkazatelDatumuG.Value = datumG;
-                    poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
+            ukazatelChyb.SetError(ciselnikDny, null);
+        }
 
-                }
-                else if (ciloveDnyDoKonceSveta > datumEOW.DniDoKonceSveta)
-                {
-                    do
-                    {
-                        datumG = datumG.AddDays(-1);
-                        datumEOW.AddDays(-1);
-                    } while (ciloveDnyDoKonceSveta != datumEOW.DniDoKonceSveta);
-                    poleEOW.Text = datumEOW.ToString();
-                    UkazatelDatumuG.Value = datumG;
-                    poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-                }
-                else
-                {
-                    poleEOW.Text = datumEOW.ToString();
-                    UkazatelDatumuG.Value = datumG;
-                    poleLetG.Text = (Convert.ToInt32(poleDny.Text) / 365).ToString();
-                }
-            }
-            catch (ArgumentOutOfRangeException)
+        private void ciselnikDny_Validating(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (ciselnikDny.Value == 0)
             {
-
+                ukazatelChyb.SetError(ciselnikDny, "Počet dnů do konce světa nemůže být 0");
+                e.Cancel = true;
             }
-            interakceUzivatele = true;
         }
     }
 }
